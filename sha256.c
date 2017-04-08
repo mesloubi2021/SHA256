@@ -1,3 +1,10 @@
+/* types modified for libcurl.
+ * unmodified source can be found at https://github.com/ilvn/SHA256
+ *
+ * Test:
+ * cl /W4 /DSELF_TEST sha256.c
+ * gcc -Wall -Wextra -std=c89 -DSELF_TEST -o sha256 sha256.c
+ */
 /*
 *   SHA-256 implementation.
 *
@@ -16,8 +23,8 @@
 *   OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 #define SWAP_BYTES
-// #define USE_STD_MEMCPY
-// #define SELF_TEST
+/* #define USE_STD_MEMCPY */
+/* #define SELF_TEST */
 
 #ifdef USE_STD_MEMCPY
 #include <string.h>
@@ -27,6 +34,9 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+typedef unsigned char uint8_t;
+typedef unsigned int uint32_t;
 
 #define RL(x,n)   (((x) << n) | ((x) >> (32 - n)))
 #define RR(x,n)   (((x) >> n) | ((x) << (32 - n)))
@@ -184,11 +194,9 @@ void sha256_done(sha256_context *ctx, uint8_t *buf)
 
 
 #ifdef SELF_TEST
-#pragma warning (push, 0)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#pragma warning(pop)
 
 char *buf[] = {
     "",
@@ -216,15 +224,35 @@ int main(int argc, char *argv[])
     uint8_t hv[32];
     uint32_t i, j;
 
+    size_t pos;
+    char s[(8 + 1) * 8]; /* space after every 8 digits except nul the last */
+    const char *hex = "0123456789abcdef";
+
     for (j = 0; j < (sizeof(buf)/sizeof(buf[0])); j += 2)
     {
         sha256_init(&ctx);
         sha256_hash(&ctx, (uint8_t *)buf[j], (uint32_t)strlen(buf[j]));
         sha256_done(&ctx, hv);
         printf("input = %s\ndigest: %s\nresult: ", buf[j], buf[j+1]);
-        for (i = 0; i < 32; i++) printf("%02x%s", hv[i], ((i%4)==3)?" ":"");
-        printf("\n\n");
+        for(pos = 0, i = 0; i < 32; i++)
+        {
+            s[pos++] = hex[hv[i] >> 4];
+            s[pos++] = hex[hv[i] & 0xF];
+            if(i != 31 && (i % 4) == 3)
+            {
+                s[pos++] = ' ';
+            }
+        }
+        s[pos] = '\0';
+        printf("%s\n\n", s);
+        if(strcmp(s, buf[j+1]))
+        {
+            fprintf(stderr, "Fatal: Test failed, digest != result.\n");
+            exit(1);
+        }
     }
+
+    printf("\nTests successful.\n\n\n");
 
     for (j = 1; j < (uint32_t)argc; j++)
     {
